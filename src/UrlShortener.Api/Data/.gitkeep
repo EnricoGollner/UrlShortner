@@ -1,2 +1,0 @@
-# Data
-Diretório reservado para persistência EF Core (DbContext, migrações e repositórios).
