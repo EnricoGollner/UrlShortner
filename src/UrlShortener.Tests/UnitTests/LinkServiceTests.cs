@@ -217,6 +217,153 @@ public class LinkServiceTests : IDisposable
         Assert.Contains("Serviço temporariamente indisponível", result.ErrorMessage);
     }
 
+    [Fact]
+    public async Task CreateLinkAsync_WithValidCustomCode_CreatesLinkSuccessfully()
+    {
+        using var context = new AppDbContext(_options);
+        var repository = new LinkRepository(context);
+        var service = new LinkService(
+            repository,
+            new CodeGenerator(),
+            new FakeUrlValidator(isValid: true));
+
+        var request = new CreateLinkRequest("https://example.com/custom", Code: "MYCODE123");
+        var result = await service.CreateLinkAsync(request);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Link);
+        Assert.Equal("MYCODE123", result.Link.Code);
+
+        var saved = await repository.GetByCodeAsync("MYCODE123");
+        Assert.NotNull(saved);
+        Assert.Equal("https://example.com/custom", saved.TargetUrl);
+    }
+
+    [Theory]
+    [InlineData("A")]
+    [InlineData("AB")]
+    [InlineData("ABC")]
+    public async Task CreateLinkAsync_WithCustomCodeTooShort_ReturnsValidationError(string shortCode)
+    {
+        using var context = new AppDbContext(_options);
+        var repository = new LinkRepository(context);
+        var service = new LinkService(
+            repository,
+            new CodeGenerator(),
+            new FakeUrlValidator(isValid: true));
+
+        var request = new CreateLinkRequest("https://example.com", Code: shortCode);
+        var result = await service.CreateLinkAsync(request);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(CreateLinkErrorType.ValidationError, result.ErrorType);
+        Assert.Contains("entre 4 e 20 caracteres", result.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task CreateLinkAsync_WithCustomCodeTooLong_ReturnsValidationError()
+    {
+        using var context = new AppDbContext(_options);
+        var repository = new LinkRepository(context);
+        var service = new LinkService(
+            repository,
+            new CodeGenerator(),
+            new FakeUrlValidator(isValid: true));
+
+        var longCode = new string('A', 21);
+        var request = new CreateLinkRequest("https://example.com", Code: longCode);
+        var result = await service.CreateLinkAsync(request);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(CreateLinkErrorType.ValidationError, result.ErrorType);
+        Assert.Contains("entre 4 e 20 caracteres", result.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task CreateLinkAsync_WithCustomCodeContainingZero_ReturnsValidationError()
+    {
+        using var context = new AppDbContext(_options);
+        var repository = new LinkRepository(context);
+        var service = new LinkService(
+            repository,
+            new CodeGenerator(),
+            new FakeUrlValidator(isValid: true));
+
+        var request = new CreateLinkRequest("https://example.com", Code: "CODE0123");
+        var result = await service.CreateLinkAsync(request);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(CreateLinkErrorType.ValidationError, result.ErrorType);
+        Assert.Contains("apenas letras maiúsculas de A a Z e números de 1 a 9", result.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task CreateLinkAsync_WithCustomCodeContainingLowercase_ReturnsValidationError()
+    {
+        using var context = new AppDbContext(_options);
+        var repository = new LinkRepository(context);
+        var service = new LinkService(
+            repository,
+            new CodeGenerator(),
+            new FakeUrlValidator(isValid: true));
+
+        var request = new CreateLinkRequest("https://example.com", Code: "myCode123");
+        var result = await service.CreateLinkAsync(request);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(CreateLinkErrorType.ValidationError, result.ErrorType);
+        Assert.Contains("apenas letras maiúsculas de A a Z e números de 1 a 9", result.ErrorMessage);
+    }
+
+    [Theory]
+    [InlineData("CODE 123")]
+    [InlineData("CODE-123")]
+    [InlineData("CODE_123")]
+    [InlineData("CODE@123")]
+    public async Task CreateLinkAsync_WithCustomCodeContainingSpacesOrSpecialChars_ReturnsValidationError(string invalidCode)
+    {
+        using var context = new AppDbContext(_options);
+        var repository = new LinkRepository(context);
+        var service = new LinkService(
+            repository,
+            new CodeGenerator(),
+            new FakeUrlValidator(isValid: true));
+
+        var request = new CreateLinkRequest("https://example.com", Code: invalidCode);
+        var result = await service.CreateLinkAsync(request);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(CreateLinkErrorType.ValidationError, result.ErrorType);
+        Assert.Contains("apenas letras maiúsculas de A a Z e números de 1 a 9", result.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task CreateLinkAsync_WithDuplicateCustomCode_ReturnsConflict()
+    {
+        using var context = new AppDbContext(_options);
+        var repository = new LinkRepository(context);
+
+        await repository.AddAsync(new Link
+        {
+            Code = "EXISTING",
+            TargetUrl = "https://existing.com",
+            CreatedAtUtc = DateTime.UtcNow
+        });
+        await repository.SaveChangesAsync();
+
+        var service = new LinkService(
+            repository,
+            new CodeGenerator(),
+            new FakeUrlValidator(isValid: true));
+
+        var request = new CreateLinkRequest("https://example.com/new", Code: "EXISTING");
+        var result = await service.CreateLinkAsync(request);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(CreateLinkErrorType.Conflict, result.ErrorType);
+        Assert.Equal("O código informado já está em uso.", result.ErrorMessage);
+    }
+
     public void Dispose()
     {
         _connection.Dispose();

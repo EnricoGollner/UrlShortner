@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using UrlShortener.Api.Data;
 using UrlShortener.Api.Models;
 
@@ -6,6 +7,8 @@ namespace UrlShortener.Api.Services;
 public class LinkService : ILinkService
 {
     public const int MaxCollisionAttempts = 5;
+    public const int MinCustomCodeLength = 4;
+    public const int MaxCustomCodeLength = 20;
 
     private readonly ILinkRepository _linkRepository;
     private readonly ICodeGenerator _codeGenerator;
@@ -63,7 +66,7 @@ public class LinkService : ILinkService
 
         string finalCode;
 
-        if (string.IsNullOrWhiteSpace(request.Code))
+        if (request.Code is null)
         {
             // Geração automática com até 5 tentativas consecutivas em caso de colisão (RN-06, D-06)
             string? codeCandidate = null;
@@ -90,9 +93,29 @@ public class LinkService : ILinkService
         }
         else
         {
-            var trimmedCode = request.Code.Trim();
+            var code = request.Code;
 
-            if (await _linkRepository.ExistsByCodeAsync(trimmedCode, cancellationToken))
+            // Validação de formato para código próprio (RF-03, RN-05)
+            if (code.Length < MinCustomCodeLength || code.Length > MaxCustomCodeLength)
+            {
+                return new CreateLinkResult(
+                    false,
+                    null,
+                    $"O código próprio deve ter entre {MinCustomCodeLength} e {MaxCustomCodeLength} caracteres.",
+                    CreateLinkErrorType.ValidationError);
+            }
+
+            if (!code.All(c => (c >= 'A' && c <= 'Z') || (c >= '1' && c <= '9')))
+            {
+                return new CreateLinkResult(
+                    false,
+                    null,
+                    "O código próprio deve conter apenas letras maiúsculas de A a Z e números de 1 a 9.",
+                    CreateLinkErrorType.ValidationError);
+            }
+
+            // Checagem de unicidade prévia (RN-01, D-04)
+            if (await _linkRepository.ExistsByCodeAsync(code, cancellationToken))
             {
                 return new CreateLinkResult(
                     false,
@@ -101,7 +124,7 @@ public class LinkService : ILinkService
                     CreateLinkErrorType.Conflict);
             }
 
-            finalCode = trimmedCode;
+            finalCode = code;
         }
 
         var link = new Link
@@ -113,8 +136,20 @@ public class LinkService : ILinkService
             AccessCount = 0
         };
 
-        await _linkRepository.AddAsync(link, cancellationToken);
-        await _linkRepository.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _linkRepository.AddAsync(link, cancellationToken);
+            await _linkRepository.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            // D-04: caso ocorra concorrência na inserção violando o índice único
+            return new CreateLinkResult(
+                false,
+                null,
+                "O código informado já está em uso.",
+                CreateLinkErrorType.Conflict);
+        }
 
         return new CreateLinkResult(true, link);
     }

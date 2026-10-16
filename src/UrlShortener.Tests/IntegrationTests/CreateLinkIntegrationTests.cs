@@ -102,4 +102,65 @@ public class CreateLinkIntegrationTests : IClassFixture<WebApplicationFactory<Pr
         Assert.Equal("Erro de validação", problem.Title);
         Assert.Contains("HTTP ou HTTPS", problem.Detail);
     }
+
+    [Fact]
+    public async Task PostCreateLink_WithValidCustomCode_Returns201CreatedAndCustomCode()
+    {
+        // Arrange
+        var customCode = "CUSTOM99";
+        var request = new CreateLinkRequest("https://example.com/custom-test", Code: customCode);
+
+        // Act
+        var response = await _client.PostAsJsonAsync("/api/links", request);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<CreateLinkResponse>();
+        Assert.NotNull(body);
+        Assert.Equal(customCode, body.Code);
+        Assert.Equal($"/{customCode}", response.Headers.Location?.ToString());
+    }
+
+    [Fact]
+    public async Task PostCreateLink_WithDuplicateCustomCode_Returns409Conflict()
+    {
+        // Arrange
+        var customCode = "DUPCODE1";
+        var request1 = new CreateLinkRequest("https://example.com/first-link", Code: customCode);
+        var request2 = new CreateLinkRequest("https://example.com/second-link", Code: customCode);
+
+        // Act
+        var response1 = await _client.PostAsJsonAsync("/api/links", request1);
+        var response2 = await _client.PostAsJsonAsync("/api/links", request2);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Created, response1.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, response2.StatusCode);
+
+        var problem = await response2.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(problem);
+        Assert.Equal(409, problem.Status);
+        Assert.Equal("Conflito de código", problem.Title);
+        Assert.Equal("O código informado já está em uso.", problem.Detail);
+    }
+
+    [Fact]
+    public async Task PostCreateLink_WithInvalidCustomCodeFormat_Returns400BadRequest()
+    {
+        // Arrange: lowercase letters or 0 are invalid
+        var request = new CreateLinkRequest("https://example.com/invalid-code", Code: "invalid0");
+
+        // Act
+        var response = await _client.PostAsJsonAsync("/api/links", request);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(problem);
+        Assert.Equal(400, problem.Status);
+        Assert.Equal("Erro de validação", problem.Title);
+        Assert.Contains("apenas letras maiúsculas de A a Z e números de 1 a 9", problem.Detail);
+    }
 }
