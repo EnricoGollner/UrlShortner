@@ -458,6 +458,85 @@ public class LinkServiceTests : IDisposable
         Assert.Equal("Este link expirou.", result.ErrorMessage);
     }
 
+    [Fact]
+    public async Task GetStatsAsync_WhenLinkExists_ReturnsStatistics()
+    {
+        using var context = new AppDbContext(_options);
+        var repository = new LinkRepository(context);
+
+        var createdAt = DateTime.UtcNow.AddDays(-1);
+        await repository.AddAsync(new Link
+        {
+            Code = "STAT123",
+            TargetUrl = "https://example.com/stats",
+            CreatedAtUtc = createdAt,
+            AccessCount = 42
+        });
+        await repository.SaveChangesAsync();
+
+        var service = new LinkService(
+            repository,
+            new CodeGenerator(),
+            new FakeUrlValidator(isValid: true));
+
+        var result = await service.GetStatsAsync("STAT123");
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Stats);
+        Assert.Equal("STAT123", result.Stats.Code);
+        Assert.Equal("https://example.com/stats", result.Stats.TargetUrl);
+        Assert.Equal(42, result.Stats.AccessCount);
+        Assert.False(result.Stats.IsExpired);
+    }
+
+    [Fact]
+    public async Task GetStatsAsync_WhenLinkIsExpired_ReturnsStatisticsWithIsExpiredTrue()
+    {
+        using var context = new AppDbContext(_options);
+        var repository = new LinkRepository(context);
+
+        await repository.AddAsync(new Link
+        {
+            Code = "STATEXP",
+            TargetUrl = "https://example.com/stat-expired",
+            CreatedAtUtc = DateTime.UtcNow.AddDays(-10),
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(-1),
+            AccessCount = 99
+        });
+        await repository.SaveChangesAsync();
+
+        var service = new LinkService(
+            repository,
+            new CodeGenerator(),
+            new FakeUrlValidator(isValid: true));
+
+        // RF-07: devolve total de acessos mesmo após expiração
+        var result = await service.GetStatsAsync("STATEXP");
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Stats);
+        Assert.Equal(99, result.Stats.AccessCount);
+        Assert.True(result.Stats.IsExpired);
+    }
+
+    [Fact]
+    public async Task GetStatsAsync_WhenLinkDoesNotExist_ReturnsNotFound()
+    {
+        using var context = new AppDbContext(_options);
+        var repository = new LinkRepository(context);
+
+        var service = new LinkService(
+            repository,
+            new CodeGenerator(),
+            new FakeUrlValidator(isValid: true));
+
+        var result = await service.GetStatsAsync("NONEXIST");
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(GetLinkErrorType.NotFound, result.ErrorType);
+        Assert.Equal("Link não encontrado.", result.ErrorMessage);
+    }
+
     public void Dispose()
     {
         _connection.Dispose();

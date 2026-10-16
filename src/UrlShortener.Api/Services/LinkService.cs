@@ -178,4 +178,31 @@ public class LinkService : ILinkService
 
         return new GetLinkResult(true, link.TargetUrl);
     }
+
+    public async Task<LinkStatsResult> GetStatsAsync(string code, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return new LinkStatsResult(false, null, "Link não encontrado.", GetLinkErrorType.NotFound);
+        }
+
+        var link = await _linkRepository.GetByCodeAsync(code, cancellationToken);
+        if (link == null)
+        {
+            return new LinkStatsResult(false, null, "Link não encontrado.", GetLinkErrorType.NotFound);
+        }
+
+        // RF-07: o sistema devolve o total de acessos mesmo após a expiração do link
+        var isExpired = link.ExpiresAtUtc.HasValue && link.ExpiresAtUtc.Value <= DateTime.UtcNow;
+
+        var stats = new LinkStatsResponse(
+            link.Code,
+            link.TargetUrl,
+            link.AccessCount,
+            link.CreatedAtUtc,
+            link.ExpiresAtUtc,
+            isExpired);
+
+        return new LinkStatsResult(true, stats);
+    }
 }

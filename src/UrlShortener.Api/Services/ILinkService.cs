@@ -31,8 +31,16 @@ public record GetLinkResult(
     GetLinkErrorType ErrorType = GetLinkErrorType.None
 );
 
+public record LinkStatsResult(
+    bool IsSuccess,
+    LinkStatsResponse? Stats = null,
+    string? ErrorMessage = null,
+    GetLinkErrorType ErrorType = GetLinkErrorType.None
+);
+
 public interface ILinkService
 {
     Task<CreateLinkResult> CreateLinkAsync(CreateLinkRequest request, CancellationToken cancellationToken = default);
     Task<GetLinkResult> GetLinkForRedirectAsync(string code, CancellationToken cancellationToken = default);
+    Task<LinkStatsResult> GetStatsAsync(string code, CancellationToken cancellationToken = default);
 }
