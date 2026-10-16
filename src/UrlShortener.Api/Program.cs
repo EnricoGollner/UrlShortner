@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using UrlShortener.Api.Data;
+using UrlShortener.Api.Endpoints;
 using UrlShortener.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,9 +14,13 @@ builder.Services.AddHttpClient<IUrlValidator, UrlValidator>(client =>
     client.Timeout = TimeSpan.FromSeconds(3);
 });
 
+builder.Services.AddScoped<ILinkRepository, LinkRepository>();
+builder.Services.AddScoped<ILinkService, LinkService>();
+
 var app = builder.Build();
 
 app.MapGet("/", () => "UrlShortener API");
+app.MapLinkEndpoints();
 
 app.Run();
 
