@@ -153,4 +153,26 @@ public class LinkService : ILinkService
 
         return new CreateLinkResult(true, link);
     }
+
+    public async Task<GetLinkResult> GetLinkForRedirectAsync(string code, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return new GetLinkResult(false, null, "Link não encontrado.", GetLinkErrorType.NotFound);
+        }
+
+        var link = await _linkRepository.GetByCodeAsync(code, cancellationToken);
+        if (link == null)
+        {
+            return new GetLinkResult(false, null, "Link não encontrado.", GetLinkErrorType.NotFound);
+        }
+
+        // RN-03: link expirado não redireciona e não conta acesso
+        if (link.ExpiresAtUtc.HasValue && link.ExpiresAtUtc.Value <= DateTime.UtcNow)
+        {
+            return new GetLinkResult(false, null, "Este link expirou.", GetLinkErrorType.Expired);
+        }
+
+        return new GetLinkResult(true, link.TargetUrl);
+    }
 }

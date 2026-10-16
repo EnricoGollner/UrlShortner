@@ -51,5 +51,36 @@ public static class LinkEndpoints
             var response = new CreateLinkResponse(shortUrl, link.Code);
             return Results.Created($"/{link.Code}", response);
         });
+
+        app.MapGet("/{code}", async (
+            string code,
+            ILinkService linkService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await linkService.GetLinkForRedirectAsync(code, cancellationToken);
+
+            if (!result.IsSuccess)
+            {
+                return result.ErrorType switch
+                {
+                    GetLinkErrorType.NotFound => Results.Problem(
+                        statusCode: StatusCodes.Status404NotFound,
+                        title: "Link não encontrado",
+                        detail: result.ErrorMessage),
+
+                    GetLinkErrorType.Expired => Results.Problem(
+                        statusCode: StatusCodes.Status410Gone,
+                        title: "Link expirado",
+                        detail: result.ErrorMessage),
+
+                    _ => Results.Problem(
+                        statusCode: StatusCodes.Status500InternalServerError,
+                        title: "Erro interno",
+                        detail: result.ErrorMessage)
+                };
+            }
+
+            return Results.Redirect(result.TargetUrl!, permanent: false);
+        });
     }
 }

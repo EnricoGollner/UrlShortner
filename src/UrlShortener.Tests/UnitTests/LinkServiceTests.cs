@@ -364,6 +364,100 @@ public class LinkServiceTests : IDisposable
         Assert.Equal("O código informado já está em uso.", result.ErrorMessage);
     }
 
+    [Fact]
+    public async Task GetLinkForRedirectAsync_WhenLinkExistsAndValid_ReturnsSuccessWithTargetUrl()
+    {
+        using var context = new AppDbContext(_options);
+        var repository = new LinkRepository(context);
+
+        await repository.AddAsync(new Link
+        {
+            Code = "REDIR01",
+            TargetUrl = "https://example.com/dest",
+            CreatedAtUtc = DateTime.UtcNow
+        });
+        await repository.SaveChangesAsync();
+
+        var service = new LinkService(
+            repository,
+            new CodeGenerator(),
+            new FakeUrlValidator(isValid: true));
+
+        var result = await service.GetLinkForRedirectAsync("REDIR01");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("https://example.com/dest", result.TargetUrl);
+    }
+
+    [Fact]
+    public async Task GetLinkForRedirectAsync_CaseInsensitiveSearch_ReturnsSuccess()
+    {
+        using var context = new AppDbContext(_options);
+        var repository = new LinkRepository(context);
+
+        await repository.AddAsync(new Link
+        {
+            Code = "CASE123",
+            TargetUrl = "https://example.com/case-test",
+            CreatedAtUtc = DateTime.UtcNow
+        });
+        await repository.SaveChangesAsync();
+
+        var service = new LinkService(
+            repository,
+            new CodeGenerator(),
+            new FakeUrlValidator(isValid: true));
+
+        var result = await service.GetLinkForRedirectAsync("case123");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("https://example.com/case-test", result.TargetUrl);
+    }
+
+    [Fact]
+    public async Task GetLinkForRedirectAsync_WhenLinkDoesNotExist_ReturnsNotFound()
+    {
+        using var context = new AppDbContext(_options);
+        var repository = new LinkRepository(context);
+        var service = new LinkService(
+            repository,
+            new CodeGenerator(),
+            new FakeUrlValidator(isValid: true));
+
+        var result = await service.GetLinkForRedirectAsync("NOTFOUND");
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(GetLinkErrorType.NotFound, result.ErrorType);
+        Assert.Equal("Link não encontrado.", result.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task GetLinkForRedirectAsync_WhenLinkExpired_ReturnsExpired()
+    {
+        using var context = new AppDbContext(_options);
+        var repository = new LinkRepository(context);
+
+        await repository.AddAsync(new Link
+        {
+            Code = "EXPIRED",
+            TargetUrl = "https://example.com/expired",
+            CreatedAtUtc = DateTime.UtcNow.AddDays(-5),
+            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(-10)
+        });
+        await repository.SaveChangesAsync();
+
+        var service = new LinkService(
+            repository,
+            new CodeGenerator(),
+            new FakeUrlValidator(isValid: true));
+
+        var result = await service.GetLinkForRedirectAsync("EXPIRED");
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(GetLinkErrorType.Expired, result.ErrorType);
+        Assert.Equal("Este link expirou.", result.ErrorMessage);
+    }
+
     public void Dispose()
     {
         _connection.Dispose();

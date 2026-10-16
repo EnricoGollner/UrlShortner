@@ -14,14 +14,16 @@ public class LinkRepository : ILinkRepository
 
     public async Task<Link?> GetByCodeAsync(string code, CancellationToken cancellationToken = default)
     {
+        var normalized = code.Trim().ToLower();
         return await _context.Links
-            .FirstOrDefaultAsync(l => EF.Functions.Like(l.Code, code), cancellationToken);
+            .FirstOrDefaultAsync(l => l.Code.ToLower() == normalized, cancellationToken);
     }
 
     public async Task<bool> ExistsByCodeAsync(string code, CancellationToken cancellationToken = default)
     {
+        var normalized = code.Trim().ToLower();
         return await _context.Links
-            .AnyAsync(l => EF.Functions.Like(l.Code, code), cancellationToken);
+            .AnyAsync(l => l.Code.ToLower() == normalized, cancellationToken);
     }
 
     public async Task AddAsync(Link link, CancellationToken cancellationToken = default)
