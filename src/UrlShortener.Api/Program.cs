@@ -14,6 +14,7 @@ builder.Services.AddHttpClient<IUrlValidator, UrlValidator>(client =>
     client.Timeout = TimeSpan.FromSeconds(3);
 });
 
+builder.Services.AddMemoryCache();
 builder.Services.AddScoped<ILinkRepository, LinkRepository>();
 builder.Services.AddScoped<ILinkService, LinkService>();
 

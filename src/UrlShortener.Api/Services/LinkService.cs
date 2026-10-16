@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using UrlShortener.Api.Data;
 using UrlShortener.Api.Models;
 
@@ -13,15 +14,18 @@ public class LinkService : ILinkService
     private readonly ILinkRepository _linkRepository;
     private readonly ICodeGenerator _codeGenerator;
     private readonly IUrlValidator _urlValidator;
+    private readonly IMemoryCache? _memoryCache;
 
     public LinkService(
         ILinkRepository linkRepository,
         ICodeGenerator codeGenerator,
-        IUrlValidator urlValidator)
+        IUrlValidator urlValidator,
+        IMemoryCache? memoryCache = null)
     {
         _linkRepository = linkRepository;
         _codeGenerator = codeGenerator;
         _urlValidator = urlValidator;
+        _memoryCache = memoryCache;
     }
 
     public async Task<CreateLinkResult> CreateLinkAsync(CreateLinkRequest request, CancellationToken cancellationToken = default)
@@ -154,11 +158,30 @@ public class LinkService : ILinkService
         return new CreateLinkResult(true, link);
     }
 
+    private record CachedLink(int Id, string TargetUrl, DateTime? ExpiresAtUtc);
+
     public async Task<GetLinkResult> GetLinkForRedirectAsync(string code, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(code))
         {
             return new GetLinkResult(false, null, "Link não encontrado.", GetLinkErrorType.NotFound);
+        }
+
+        var normalizedCode = code.Trim().ToLowerInvariant();
+        var cacheKey = $"link_redirect_{normalizedCode}";
+
+        // T-10: Cache em memória dos links mais acessados para reduzir latência de redirect
+        if (_memoryCache != null && _memoryCache.TryGetValue(cacheKey, out CachedLink? cached) && cached != null)
+        {
+            if (cached.ExpiresAtUtc.HasValue && cached.ExpiresAtUtc.Value <= DateTime.UtcNow)
+            {
+                _memoryCache.Remove(cacheKey);
+                return new GetLinkResult(false, null, "Este link expirou.", GetLinkErrorType.Expired);
+            }
+
+            // RF-05, RN-04, D-02: contador atômico é incrementado no banco
+            await _linkRepository.IncrementAccessCountAsync(cached.Id, cancellationToken);
+            return new GetLinkResult(true, cached.TargetUrl);
         }
 
         var link = await _linkRepository.GetByCodeAsync(code, cancellationToken);
@@ -171,6 +194,21 @@ public class LinkService : ILinkService
         if (link.ExpiresAtUtc.HasValue && link.ExpiresAtUtc.Value <= DateTime.UtcNow)
         {
             return new GetLinkResult(false, null, "Este link expirou.", GetLinkErrorType.Expired);
+        }
+
+        if (_memoryCache != null)
+        {
+            var cacheOptions = new MemoryCacheEntryOptions
+            {
+                SlidingExpiration = TimeSpan.FromMinutes(5)
+            };
+
+            if (link.ExpiresAtUtc.HasValue)
+            {
+                cacheOptions.AbsoluteExpiration = link.ExpiresAtUtc.Value;
+            }
+
+            _memoryCache.Set(cacheKey, new CachedLink(link.Id, link.TargetUrl, link.ExpiresAtUtc), cacheOptions);
         }
 
         // RF-05, RN-04, D-02: incrementa contador de forma atômica no banco antes de redirecionar
