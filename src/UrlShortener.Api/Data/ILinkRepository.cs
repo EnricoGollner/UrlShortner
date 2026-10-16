@@ -8,4 +8,5 @@ public interface ILinkRepository
     Task<bool> ExistsByCodeAsync(string code, CancellationToken cancellationToken = default);
     Task AddAsync(Link link, CancellationToken cancellationToken = default);
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
+    Task IncrementAccessCountAsync(int linkId, CancellationToken cancellationToken = default);
 }

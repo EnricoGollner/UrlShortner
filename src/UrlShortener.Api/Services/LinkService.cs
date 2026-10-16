@@ -173,6 +173,9 @@ public class LinkService : ILinkService
             return new GetLinkResult(false, null, "Este link expirou.", GetLinkErrorType.Expired);
         }
 
+        // RF-05, RN-04, D-02: incrementa contador de forma atômica no banco antes de redirecionar
+        await _linkRepository.IncrementAccessCountAsync(link.Id, cancellationToken);
+
         return new GetLinkResult(true, link.TargetUrl);
     }
 }

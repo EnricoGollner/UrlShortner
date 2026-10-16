@@ -35,4 +35,12 @@ public class LinkRepository : ILinkRepository
     {
         await _context.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task IncrementAccessCountAsync(int linkId, CancellationToken cancellationToken = default)
+    {
+        // D-02: UPDATE atômico no banco para atender a RN-04 sob acesso concorrente
+        await _context.Links
+            .Where(l => l.Id == linkId)
+            .ExecuteUpdateAsync(s => s.SetProperty(l => l.AccessCount, l => l.AccessCount + 1), cancellationToken);
+    }
 }
