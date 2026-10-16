@@ -8,6 +8,10 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddSingleton<ICodeGenerator, CodeGenerator>();
+builder.Services.AddHttpClient<IUrlValidator, UrlValidator>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(3);
+});
 
 var app = builder.Build();
 
