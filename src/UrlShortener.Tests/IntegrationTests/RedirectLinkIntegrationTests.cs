@@ -61,7 +61,7 @@ public class RedirectLinkIntegrationTests : IClassFixture<WebApplicationFactory<
     public async Task GetRedirect_WithDifferentCasing_Returns302Redirect()
     {
         // Arrange: cria link com código em maiúsculas
-        const string customCode = "UPPER123";
+        var customCode = $"UP{Guid.NewGuid():N}".Replace("0", "9").ToUpperInvariant()[..8];
         const string targetUrl = "https://example.com/case-destination";
         var createResponse = await _client.PostAsJsonAsync("/api/links", new CreateLinkRequest(targetUrl, Code: customCode));
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
@@ -92,7 +92,7 @@ public class RedirectLinkIntegrationTests : IClassFixture<WebApplicationFactory<
     public async Task GetRedirect_WithExpiredCode_Returns410GoneProblemDetails()
     {
         // Arrange: insere link expirado via DbContext
-        const string expiredCode = "EXPIRED1";
+        var expiredCode = $"EXP{Guid.NewGuid():N}".Replace("0", "9").ToUpperInvariant()[..8];
         const string targetUrl = "https://example.com/expired-target";
 
         using (var scope = _factory.Services.CreateScope())

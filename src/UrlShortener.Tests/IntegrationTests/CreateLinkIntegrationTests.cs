@@ -107,7 +107,7 @@ public class CreateLinkIntegrationTests : IClassFixture<WebApplicationFactory<Pr
     public async Task PostCreateLink_WithValidCustomCode_Returns201CreatedAndCustomCode()
     {
         // Arrange
-        var customCode = "CUSTOM99";
+        var customCode = $"CST{Guid.NewGuid():N}".Replace("0", "9").ToUpperInvariant()[..8];
         var request = new CreateLinkRequest("https://example.com/custom-test", Code: customCode);
 
         // Act
@@ -126,7 +126,7 @@ public class CreateLinkIntegrationTests : IClassFixture<WebApplicationFactory<Pr
     public async Task PostCreateLink_WithDuplicateCustomCode_Returns409Conflict()
     {
         // Arrange
-        var customCode = "DUPCODE1";
+        var customCode = $"DUP{Guid.NewGuid():N}".Replace("0", "9").ToUpperInvariant()[..8];
         var request1 = new CreateLinkRequest("https://example.com/first-link", Code: customCode);
         var request2 = new CreateLinkRequest("https://example.com/second-link", Code: customCode);
 

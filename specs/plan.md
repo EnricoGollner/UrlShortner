@@ -23,6 +23,8 @@ Implementa a especificação do encurtador de links, respeitando a constituiçã
   (HTTP HEAD com timeout curto)
 - D-06: geração de código automático com até 5 tentativas consecutivas de sorteio
   em caso de colisão, para atender a RN-06
+- D-07: Swagger / OpenAPI via Swashbuckle.AspNetCore para documentação interativa
+  e testes dos endpoints da API, com suporte à autenticação por chave (X-Api-Key)
 
 ## Modelo de dados
 Link

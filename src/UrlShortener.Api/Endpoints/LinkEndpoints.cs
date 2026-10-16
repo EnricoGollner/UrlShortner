@@ -8,7 +8,8 @@ public static class LinkEndpoints
 {
     public static void MapLinkEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/links");
+        var group = app.MapGroup("/api/links")
+            .WithTags("Links");
 
         group.MapPost("/", async (
             [FromBody] CreateLinkRequest request,
@@ -50,7 +51,13 @@ public static class LinkEndpoints
 
             var response = new CreateLinkResponse(shortUrl, link.Code);
             return Results.Created($"/{link.Code}", response);
-        });
+        })
+        .WithSummary("Cria um link encurtado")
+        .WithDescription("Cria um novo link encurtado com código aleatório ou código próprio customizado.")
+        .Produces<CreateLinkResponse>(StatusCodes.Status201Created)
+        .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status409Conflict)
+        .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
         group.MapGet("/{code}/stats", async (
             string code,
@@ -94,7 +101,12 @@ public static class LinkEndpoints
             }
 
             return Results.Ok(result.Stats);
-        });
+        })
+        .WithSummary("Obtém estatísticas de acesso do link")
+        .WithDescription("Retorna total de acessos do link. Requer autenticação por chave (header X-Api-Key).")
+        .Produces<LinkStatsResponse>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status404NotFound);
 
         app.MapGet("/{code}", async (
             string code,
@@ -125,6 +137,12 @@ public static class LinkEndpoints
             }
 
             return Results.Redirect(result.TargetUrl!, permanent: false);
-        });
+        })
+        .WithTags("Links")
+        .WithSummary("Redireciona para a URL de destino")
+        .WithDescription("Redireciona via 302 Found para o endereço original associado ao código encurtado.")
+        .Produces(StatusCodes.Status302Found)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status410Gone);
     }
 }

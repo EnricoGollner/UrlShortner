@@ -12,3 +12,4 @@
 | T-08 | Incrementar contador de forma atômica | RF-05, RN-04, D-02 | T-07 | Teste concorrente não perde contagem |
 | T-09 | Endpoint de estatísticas com chave | RF-07, DC-03 | T-05 | Chave errada retorna 401 |
 | T-10 | Cache em memória dos links mais acessados | | T-07 | Latência de redirect cai |
+| T-11 | Documentação interativa com Swagger e OpenAPI | D-07 | T-01 | Teste de integração do Swagger retorna 200 |

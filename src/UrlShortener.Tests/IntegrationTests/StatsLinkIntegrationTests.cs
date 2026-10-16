@@ -68,7 +68,7 @@ public class StatsLinkIntegrationTests : IClassFixture<WebApplicationFactory<Pro
     public async Task GetStats_WithValidKey_Returns200WithStatsResponse()
     {
         // Arrange: cria um link e incrementa seu contador via acesso
-        const string customCode = "STATS01";
+        var customCode = $"ST{Guid.NewGuid():N}".Replace("0", "9").ToUpperInvariant()[..8];
         const string targetUrl = "https://example.com/analytics";
 
         var createResponse = await _client.PostAsJsonAsync("/api/links", new CreateLinkRequest(targetUrl, Code: customCode));
@@ -99,7 +99,7 @@ public class StatsLinkIntegrationTests : IClassFixture<WebApplicationFactory<Pro
     public async Task GetStats_WithValidKeyForExpiredLink_Returns200WithStats_RF07()
     {
         // Arrange: insere link expirado diretamente no banco
-        const string expiredCode = "STATEXP1";
+        var expiredCode = $"SE{Guid.NewGuid():N}".Replace("0", "9").ToUpperInvariant()[..8];
         const string targetUrl = "https://example.com/expired-stats";
 
         using (var scope = _factory.Services.CreateScope())
