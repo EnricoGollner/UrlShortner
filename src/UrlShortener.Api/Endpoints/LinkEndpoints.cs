@@ -61,35 +61,9 @@ public static class LinkEndpoints
 
         group.MapGet("/{code}/stats", async (
             string code,
-            HttpContext httpContext,
-            IConfiguration configuration,
             ILinkService linkService,
             CancellationToken cancellationToken) =>
         {
-            var expectedKey = configuration["StatsApiKey"] ?? "secret-stats-key";
-
-            string? providedKey = null;
-            if (httpContext.Request.Headers.TryGetValue("X-Api-Key", out var headerKey))
-            {
-                providedKey = headerKey.ToString();
-            }
-            else if (httpContext.Request.Headers.TryGetValue("X-Stats-Key", out var statsHeaderKey))
-            {
-                providedKey = statsHeaderKey.ToString();
-            }
-            else if (httpContext.Request.Query.TryGetValue("key", out var queryKey))
-            {
-                providedKey = queryKey.ToString();
-            }
-
-            if (string.IsNullOrWhiteSpace(providedKey) || !string.Equals(providedKey, expectedKey, StringComparison.Ordinal))
-            {
-                return Results.Problem(
-                    statusCode: StatusCodes.Status401Unauthorized,
-                    title: "Não autorizado",
-                    detail: "Chave de acesso inválida ou não fornecida.");
-            }
-
             var result = await linkService.GetStatsAsync(code, cancellationToken);
 
             if (!result.IsSuccess)
@@ -103,9 +77,8 @@ public static class LinkEndpoints
             return Results.Ok(result.Stats);
         })
         .WithSummary("Obtém estatísticas de acesso do link")
-        .WithDescription("Retorna total de acessos do link. Requer autenticação por chave (header X-Api-Key).")
+        .WithDescription("Retorna total de acessos e data de criação do link. Consulta pública (FR-014).")
         .Produces<LinkStatsResponse>(StatusCodes.Status200OK)
-        .ProducesProblem(StatusCodes.Status401Unauthorized)
         .ProducesProblem(StatusCodes.Status404NotFound);
 
         app.MapGet("/{code}", async (

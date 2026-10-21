@@ -138,11 +138,10 @@ Acessa o código encurtado e redireciona imediatamente ao destino.
 ---
 
 ### 3. Consultar Estatísticas de Acessos
-Consulta analítica do total de acessos de um código, acessível mesmo após expiração.
+Consulta pública do total de acessos de um código, acessível a qualquer pessoa mesmo após expiração do link (FR-014).
 
 - **Método**: `GET`
 - **Rota**: `/api/links/{code}/stats`
-- **Headers**: `X-Api-Key: secret-stats-key` *(configurável em appsettings.json)*
 
 **Resposta de Sucesso (`200 OK`)**:
 ```json
@@ -157,7 +156,6 @@ Consulta analítica do total de acessos de um código, acessível mesmo após ex
 ```
 
 **Respostas de Erro**:
-- `401 Unauthorized`: Chave de API ausente ou incorreta.
 - `404 Not Found`: Código não encontrado.
 
 ---
@@ -166,11 +164,19 @@ Consulta analítica do total de acessos de um código, acessível mesmo após ex
 
 ```text
 UrlShortener/
-├── specs/                           # Especificações, constituição e tarefas
-│   ├── constitution.md              # Princípios arquiteturais e regras
-│   ├── plan.md                      # Plano técnico e decisões arquiteturais
-│   ├── spec.md                      # Requisitos funcionais e regras de negócio
-│   └── tasks.md                     # Lista e status das tarefas do projeto
+├── .specify/                        # Configurações, templates e governança do Spec Kit
+│   └── memory/
+│       └── constitution.md          # Princípios arquiteturais e regras do projeto
+├── specs/                           # Especificações e planejamento técnico por funcionalidade
+│   └── 001-url-shortener/           # Feature: Encurtador de URLs
+│       ├── spec.md                  # Requisitos funcionais e histórias de usuário
+│       ├── plan.md                  # Plano técnico e arquitetura de implementação
+│       ├── tasks.md                 # Lista de tarefas granulares e ordenadas
+│       ├── research.md              # Pesquisa técnica e decisões de engenharia
+│       ├── data-model.md            # Modelo de dados e ciclo de vida
+│       ├── quickstart.md            # Guia de validação ponta a ponta
+│       ├── contracts/               # Contratos formais da API HTTP
+│       └── checklists/              # Checklist de qualidade da especificação
 ├── src/
 │   ├── UrlShortener.Api/            # Aplicação Web (Minimal API)
 │   │   ├── Data/                    # Contexto EF Core e Repositórios

@@ -14,7 +14,6 @@ public class StatsLinkIntegrationTests : IClassFixture<WebApplicationFactory<Pro
 {
     private readonly WebApplicationFactory<Program> _factory;
     private readonly HttpClient _client;
-    private const string ValidApiKey = "secret-stats-key";
 
     public StatsLinkIntegrationTests(WebApplicationFactory<Program> factory)
     {
@@ -38,34 +37,7 @@ public class StatsLinkIntegrationTests : IClassFixture<WebApplicationFactory<Pro
     }
 
     [Fact]
-    public async Task GetStats_WithInvalidKey_Returns401Unauthorized()
-    {
-        // Act: requisição com chave errada (critério de aceite de T-09)
-        var request = new HttpRequestMessage(HttpMethod.Get, "/api/links/ANYCODE/stats");
-        request.Headers.Add("X-Api-Key", "invalid-key");
-
-        var response = await _client.SendAsync(request);
-
-        // Assert
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
-        Assert.NotNull(problem);
-        Assert.Equal(401, problem.Status);
-        Assert.Equal("Não autorizado", problem.Title);
-    }
-
-    [Fact]
-    public async Task GetStats_WithoutKey_Returns401Unauthorized()
-    {
-        // Act: requisição sem fornecer chave
-        var response = await _client.GetAsync("/api/links/ANYCODE/stats");
-
-        // Assert
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task GetStats_WithValidKey_Returns200WithStatsResponse()
+    public async Task GetStats_WithoutKey_Returns200WithStatsResponse_FR014()
     {
         // Arrange: cria um link e incrementa seu contador via acesso
         var customCode = $"ST{Guid.NewGuid():N}".Replace("0", "9").ToUpperInvariant()[..8];
@@ -78,11 +50,8 @@ public class StatsLinkIntegrationTests : IClassFixture<WebApplicationFactory<Pro
         await _client.GetAsync($"/{customCode}");
         await _client.GetAsync($"/{customCode}");
 
-        // Act: consulta stats com a chave correta
-        var request = new HttpRequestMessage(HttpMethod.Get, $"/api/links/{customCode}/stats");
-        request.Headers.Add("X-Api-Key", ValidApiKey);
-
-        var response = await _client.SendAsync(request);
+        // Act: consulta pública sem cabeçalhos de autenticação conforme FR-014
+        var response = await _client.GetAsync($"/api/links/{customCode}/stats");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -96,7 +65,27 @@ public class StatsLinkIntegrationTests : IClassFixture<WebApplicationFactory<Pro
     }
 
     [Fact]
-    public async Task GetStats_WithValidKeyForExpiredLink_Returns200WithStats_RF07()
+    public async Task GetStats_WithOptionalKeyHeader_Returns200WithStatsResponse()
+    {
+        // Arrange
+        var customCode = $"SK{Guid.NewGuid():N}".Replace("0", "9").ToUpperInvariant()[..8];
+        const string targetUrl = "https://example.com/analytics-key";
+
+        var createResponse = await _client.PostAsJsonAsync("/api/links", new CreateLinkRequest(targetUrl, Code: customCode));
+        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+
+        var request = new HttpRequestMessage(HttpMethod.Get, $"/api/links/{customCode}/stats");
+        request.Headers.Add("X-Api-Key", "optional-client-key");
+
+        // Act
+        var response = await _client.SendAsync(request);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetStats_ForExpiredLink_Returns200WithStats_RF07()
     {
         // Arrange: insere link expirado diretamente no banco
         var expiredCode = $"SE{Guid.NewGuid():N}".Replace("0", "9").ToUpperInvariant()[..8];
@@ -116,11 +105,8 @@ public class StatsLinkIntegrationTests : IClassFixture<WebApplicationFactory<Pro
             await db.SaveChangesAsync();
         }
 
-        // Act: RF-07 exige que consulta de stats devolva acessos mesmo após expiração
-        var request = new HttpRequestMessage(HttpMethod.Get, $"/api/links/{expiredCode}/stats");
-        request.Headers.Add("X-Api-Key", ValidApiKey);
-
-        var response = await _client.SendAsync(request);
+        // Act: consulta pública de link expirado conforme RF-07 / FR-014
+        var response = await _client.GetAsync($"/api/links/{expiredCode}/stats");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -133,13 +119,10 @@ public class StatsLinkIntegrationTests : IClassFixture<WebApplicationFactory<Pro
     }
 
     [Fact]
-    public async Task GetStats_WithValidKeyForNonExistentCode_Returns404NotFound()
+    public async Task GetStats_ForNonExistentCode_Returns404NotFound()
     {
-        // Act
-        var request = new HttpRequestMessage(HttpMethod.Get, "/api/links/NONEXIST/stats");
-        request.Headers.Add("X-Api-Key", ValidApiKey);
-
-        var response = await _client.SendAsync(request);
+        // Act: código inexistente deve retornar 404
+        var response = await _client.GetAsync("/api/links/NONEXIST/stats");
 
         // Assert
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
